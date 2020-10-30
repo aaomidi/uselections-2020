@@ -25,10 +25,12 @@ type Vote struct {
 	Count          int
 	Percentage     int
 	ElectoralVotes int
+	StateVote      *StateVote // Link to the information about the entire state
 }
 
 // StateVote is the representation of the state of voting in a given state
 type StateVote struct {
+	State               State
 	TotalVotes          int
 	TurnoutPercentage   float64
 	ReportingPercentage float64
