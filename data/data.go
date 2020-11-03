@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"github.com/aaomidi/uselections-2020/election"
 	"github.com/aaomidi/uselections-2020/scraper"
 	"time"
@@ -20,7 +21,7 @@ func (d *Data) Start(s scraper.Scraper) {
 	broadcaster := make(chan BroadcastRequest)
 	d.broadcaster = broadcaster
 
-	aggregation := make(chan []election.Vote, 1)
+	aggregation := make(chan []election.Vote)
 	go func(s scraper.Scraper) {
 
 		for range time.Tick(5 * time.Second) {
@@ -45,7 +46,11 @@ func (d *Data) aggregate(incoming <-chan []election.Vote, broadcastRequests <-ch
 				listeners = append(listeners, newBroadcast)
 			case newVoteBucket := <-incoming:
 				for _, listener := range listeners {
-					listener.listenerWritable <- newVoteBucket
+					select {
+					case listener.listenerWritable <- newVoteBucket:
+					default:
+						fmt.Println("Some listener was full :/")
+					}
 				}
 			}
 		}
