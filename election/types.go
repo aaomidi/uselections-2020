@@ -13,6 +13,10 @@ type Party struct {
 	Abbreviation string
 }
 
+func (p *Party) Single() string {
+	return string(p.Name[0])
+}
+
 type State struct {
 	Name         string
 	Abbreviation string

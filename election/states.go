@@ -55,7 +55,7 @@ var usc = map[string]string{
 	"WY": "Wyoming",
 }
 
-func HasState(code string) bool {
+func StateExists(code string) bool {
 	_, ok := usc[code]
 	return ok
 }

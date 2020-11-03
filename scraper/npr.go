@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	//AllStatesURL shows every state
+	// AllStatesURL shows every state
 	AllStatesURL = "https://apps.npr.org/elections20-interactive/data/president.json"
 
-	//StateFormatURL is used to format the URL
+	// StateFormatURL is used to format the URL
 	StateFormatURL = "https://apps.npr.org/elections20-interactive/data/states/%s.json"
 )
 
@@ -22,7 +22,7 @@ type NPRStateData struct {
 	Results []NPRElectionData
 }
 
-//Transform transforms the NPRData to our data format
+// Transform transforms the NPRData to our data format
 func (data *NPRStateData) Transform() []election.Vote {
 	var votes []election.Vote
 
@@ -30,7 +30,7 @@ func (data *NPRStateData) Transform() []election.Vote {
 		// currently we only care about president. NPR offers senate. If we have time (which we likely won't)
 		// We can add senate and house since the data is easily accessible.
 		if !result.Test && result.Office == "P" {
-			votes = result.Transform(votes)
+			votes = append(votes, result.Transform()...)
 		}
 	}
 
@@ -86,7 +86,7 @@ type NPRElectionData struct {
 	Candidates []NPRCandidateData
 }
 
-func (data *NPRElectionData) Transform(votes []election.Vote) []election.Vote {
+func (data *NPRElectionData) Transform() []election.Vote {
 	stateResults := election.StateResults{
 		State: election.State{
 			Name:         data.StateName,
@@ -97,7 +97,7 @@ func (data *NPRElectionData) Transform(votes []election.Vote) []election.Vote {
 		TotalPrecincts:      data.Precincts,
 	}
 
-	//var votes []election.Vote
+	var votes []election.Vote
 
 	for _, candidate := range data.Candidates {
 		stateResults.TotalVotes += candidate.Votes
@@ -149,14 +149,14 @@ type NPRCandidateData struct {
 func FormatURL(code string) string {
 	code = strings.ToUpper(code)
 
-	if election.HasState(code) {
+	if election.StateExists(code) {
 		return fmt.Sprintf(StateFormatURL, code)
 	}
 	return AllStatesURL
 }
 
-//NPRScraper is an implementation of the Scraper interface
-//using the NPR interactive election data
+// NPRScraper is an implementation of the Scraper interface
+// using the NPR interactive election data
 // URL: https://apps.npr.org/elections20-interactive/data/president.json
 type NPRScraper struct{}
 
@@ -176,6 +176,8 @@ func (npr *NPRScraper) Scrape(ctx context.Context) <-chan election.Vote {
 		for _, vote := range results {
 			channel <- vote
 		}
+
+		close(channel) // close the channel when we're done sending the items
 	}(ctx)
 
 	return channel
@@ -197,6 +199,12 @@ func (npr *NPRScraper) Fetch(state string) ([]election.Vote, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			panic(err) // i feel like panicking isn't great
+		}
+	}()
 
 	data, err := ioutil.ReadAll(response.Body)
 
