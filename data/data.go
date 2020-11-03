@@ -2,9 +2,9 @@ package data
 
 import (
 	"context"
-	"fmt"
 	"github.com/aaomidi/uselections-2020/election"
 	"github.com/aaomidi/uselections-2020/scraper"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -48,7 +48,7 @@ func (d *Data) aggregate(incoming <-chan []election.Vote, broadcastRequests <-ch
 				select {
 				case listener.listenerWritable <- newVoteBucket:
 				default:
-					fmt.Println("Some listener was full :/")
+					log.Warning("Some listener was full :/")
 				}
 			}
 		}

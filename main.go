@@ -1,7 +1,7 @@
 package main
 
-import "fmt"
+import "github.com/aaomidi/uselections-2020/cmd"
 
 func main() {
-	fmt.Println("Initial state")
+	cmd.Execute()
 }
