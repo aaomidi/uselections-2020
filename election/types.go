@@ -23,17 +23,24 @@ type Vote struct {
 	Candidate      Candidate
 	State          State
 	Count          int
-	Percentage     int
+	Percentage     float64
 	ElectoralVotes int
-	StateVote      StateVote // Link to the information about the entire state
+	StateVote      StateResults // Link to the information about the entire state
 }
 
-// StateVote is the representation of the state of voting in a given state
-type StateVote struct {
+// StateResults is the representation of the state of voting in a given state
+type StateResults struct {
 	State               State
 	TotalVotes          int
 	TurnoutPercentage   float64
 	ReportingPercentage float64
 	ReportingCount      int
 	TotalPrecincts      int
+	Winner              []Winner
+}
+
+// Winner represents a candidate and their electoral votes
+type Winner struct {
+	Candidate      Candidate
+	ElectoralVotes int
 }
