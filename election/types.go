@@ -22,7 +22,7 @@ type State struct {
 type Vote struct {
 	Candidate      Candidate
 	State          State
-	Count          int
+	Count          int64
 	Percentage     float64
 	ElectoralVotes int
 	StateVote      StateResults // Link to the information about the entire state
@@ -31,7 +31,7 @@ type Vote struct {
 // StateResults is the representation of the state of voting in a given state
 type StateResults struct {
 	State               State
-	TotalVotes          int
+	TotalVotes          int64
 	TurnoutPercentage   float64
 	ReportingPercentage float64
 	ReportingCount      int

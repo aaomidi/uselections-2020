@@ -1,0 +1,6 @@
+*.exe
+*.o
+*.s
+.idea/
+# for any test data
+*.json

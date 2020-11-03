@@ -55,6 +55,11 @@ var usc = map[string]string{
 	"WY": "Wyoming",
 }
 
+func HasState(code string) bool {
+	_, ok := usc[code]
+	return ok
+}
+
 func GetStates() []State {
 	states := GetIndexStates()
 	v := make([]State, 0, len(states))
