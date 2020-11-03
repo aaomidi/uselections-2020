@@ -24,7 +24,7 @@ func (d *Data) Start(s scraper.Scraper) {
 	go func(s scraper.Scraper) {
 
 		for range time.Tick(5 * time.Second) {
-			votes := make([]election.Vote, 0, 50)
+			votes := make([]election.Vote, 0, 153)
 			for vote := range s.Scrape(context.Background()) {
 				votes = append(votes, vote)
 			}
