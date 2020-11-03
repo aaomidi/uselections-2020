@@ -14,7 +14,15 @@ type Data struct {
 
 type BroadcastRequest struct {
 	// listenerWritable will accept writable channels to broadcast vote results
-	listenerWritable chan<- []election.Vote
+	listenerWritable chan<- OutgoingUpdate
+}
+
+type OutgoingUpdate struct {
+	// Votes contains all the updated votes
+	Votes []election.Vote
+
+	// NotificationVotes these are the interesting votes that passed a certain threshold and we should tell users about that
+	NotificationVotes []election.Vote
 }
 
 func (d *Data) Start(s scraper.Scraper) {
@@ -46,7 +54,10 @@ func (d *Data) aggregate(incoming <-chan []election.Vote, broadcastRequests <-ch
 		case newVoteBucket := <-incoming:
 			for _, listener := range listeners {
 				select {
-				case listener.listenerWritable <- newVoteBucket:
+				case listener.listenerWritable <- OutgoingUpdate{
+					Votes:             newVoteBucket,
+					NotificationVotes: nil,
+				}:
 				default:
 					log.Warning("Some listener was full :/")
 				}
@@ -55,7 +66,7 @@ func (d *Data) aggregate(incoming <-chan []election.Vote, broadcastRequests <-ch
 	}
 }
 
-func (d *Data) RegisterDataReceiver(writable chan<- []election.Vote) {
+func (d *Data) RegisterDataReceiver(writable chan<- OutgoingUpdate) {
 	d.broadcaster <- BroadcastRequest{
 		listenerWritable: writable,
 	}
