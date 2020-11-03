@@ -1,4 +1,4 @@
-name: golangci-lint
+name: release
 
 on:
   push:
@@ -55,7 +55,7 @@ jobs:
         run: docker push ${{ secrets.DOCKER_USERNAME }}/uselections-2020:latest
 
       - name: Tag image
-        run: docker tag ${{ secrets.DOCKER_USERNAME }}/uselections-2020:latest ${{ secrets.DOCKER_USERNAME }}/uselections-2020:${{ github.event.release.tag_name }}
+        run: docker tag ${{ secrets.DOCKER_USERNAME }}/uselections-2020:latest ${{ secrets.DOCKER_USERNAME }}/uselections-2020:${{ github.ref }}
 
       - name: Push tagged image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/uselections-2020:${{ github.event.release.tag_name }}
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/uselections-2020:${{ github.ref }}
