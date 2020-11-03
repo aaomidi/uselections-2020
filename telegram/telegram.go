@@ -6,14 +6,17 @@ import (
 )
 
 type Telegram struct {
-	token string
-	bot   *tb.Bot
+	token     string
+	bot       *tb.Bot
+	channelID string
+	channel   *tb.Chat
 }
 
-func New(token string) Telegram {
+func New(token string, channelId string) Telegram {
 	return Telegram{
-		token: token,
-		bot:   nil,
+		token:     token,
+		bot:       nil,
+		channelID: channelId,
 	}
 }
 
@@ -28,22 +31,34 @@ func (t *Telegram) Create() error {
 		return NewError(err, "creation failed")
 	}
 
+	channel, err := t.bot.ChatByID(t.channelID)
+
+	if err != nil {
+		return NewError(err, "chat id did not resolve :(")
+	}
+
+	t.channel = channel
+
 	return nil
 }
 
-func (t *Telegram) Start() error {
+func (t *Telegram) Start() {
 	// On inline query
-	t.bot.Handle(tb.OnQuery, func(q *tb.Query) {
+	t.bot.Handle(tb.OnQuery, t.handleQuery)
 
-	})
+	// On inline chosen result
+	t.bot.Handle(tb.OnChosenInlineResult, t.handleChosenInlineResult)
 
-	t.bot.Handle(tb.OnChosenInlineResult, func(c *tb.ChosenInlineResult) {
-
-	})
-
+	// Start the bot, listen for queries
 	t.bot.Start()
+}
 
-	return nil
+func (t *Telegram) handleQuery(q *tb.Query) {
+
+}
+
+func (t *Telegram) handleChosenInlineResult(c *tb.ChosenInlineResult) {
+
 }
 
 func (t *Telegram) Stop() {
