@@ -1,0 +1,59 @@
+name: golangci-lint
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.15
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Build
+        run: go build -ldflags="-s -w" -v -o bot-linux-amd64 .
+
+      - name: Compress binaries
+        uses: svenstaro/upx-action@v2
+        with:
+          file: bot-linux-amd64
+          args: "--best --lzma"
+          strip: true
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: bot-linux-amd64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  image:
+    name: image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
+
+      - name: Build image
+        run: docker build . --file Dockerfile --tag ${{ secrets.REGISTRY_USERNAME }}/uselections-2020
+
+      - name: Push latest image
+        run: docker push ${{ secrets.REGISTRY_USERNAME }}/uselections-2020:latest
+
+      - name: Tag image
+        run: docker tag ${{ secrets.REGISTRY_USERNAME }}/uselections-2020:latest ${{ secrets.REGISTRY_USERNAME }}/uselections-2020:${{ github.event.release.tag_name }}
+
+      - name: Push tagged image
+        run: docker push ${{ secrets.REGISTRY_USERNAME }}/uselections-2020:${{ github.event.release.tag_name }}
