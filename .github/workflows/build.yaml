@@ -37,4 +37,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Build image
-        run: docker build . --file Dockerfile --tag ${{ secrets.REGISTRY_USERNAME }}/uselections-2020
+        run: docker build . --file Dockerfile --tag ${{ secrets.DOCKER_USERNAME }}/uselections-2020

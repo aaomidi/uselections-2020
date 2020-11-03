@@ -47,13 +47,13 @@ jobs:
           password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
 
       - name: Build image
-        run: docker build . --file Dockerfile --tag ${{ secrets.REGISTRY_USERNAME }}/uselections-2020
+        run: docker build . --file Dockerfile --tag ${{ secrets.DOCKER_USERNAME }}/uselections-2020
 
       - name: Push latest image
-        run: docker push ${{ secrets.REGISTRY_USERNAME }}/uselections-2020:latest
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/uselections-2020:latest
 
       - name: Tag image
-        run: docker tag ${{ secrets.REGISTRY_USERNAME }}/uselections-2020:latest ${{ secrets.REGISTRY_USERNAME }}/uselections-2020:${{ github.event.release.tag_name }}
+        run: docker tag ${{ secrets.DOCKER_USERNAME }}/uselections-2020:latest ${{ secrets.DOCKER_USERNAME }}/uselections-2020:${{ github.event.release.tag_name }}
 
       - name: Push tagged image
-        run: docker push ${{ secrets.REGISTRY_USERNAME }}/uselections-2020:${{ github.event.release.tag_name }}
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/uselections-2020:${{ github.event.release.tag_name }}
