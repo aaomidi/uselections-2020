@@ -34,27 +34,25 @@ func (d *Data) Start(s scraper.Scraper) {
 		}
 	}(s)
 
-	d.aggregate(aggregation, broadcaster)
+	go d.aggregate(aggregation, broadcaster)
 }
 
 func (d *Data) aggregate(incoming <-chan []election.Vote, broadcastRequests <-chan BroadcastRequest) {
-	go func() {
-		listeners := make([]BroadcastRequest, 0, 5)
-		for {
-			select {
-			case newBroadcast := <-broadcastRequests:
-				listeners = append(listeners, newBroadcast)
-			case newVoteBucket := <-incoming:
-				for _, listener := range listeners {
-					select {
-					case listener.listenerWritable <- newVoteBucket:
-					default:
-						fmt.Println("Some listener was full :/")
-					}
+	listeners := make([]BroadcastRequest, 0, 5)
+	for {
+		select {
+		case newBroadcast := <-broadcastRequests:
+			listeners = append(listeners, newBroadcast)
+		case newVoteBucket := <-incoming:
+			for _, listener := range listeners {
+				select {
+				case listener.listenerWritable <- newVoteBucket:
+				default:
+					fmt.Println("Some listener was full :/")
 				}
 			}
 		}
-	}()
+	}
 }
 
 func (d *Data) RegisterDataReceiver(writable chan<- []election.Vote) {
