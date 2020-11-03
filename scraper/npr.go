@@ -3,19 +3,14 @@ package scraper
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/aaomidi/uselections-2020/election"
 	"io/ioutil"
 	"net/http"
-	"strings"
 )
 
 const (
 	// AllStatesURL shows every state
 	AllStatesURL = "https://apps.npr.org/elections20-interactive/data/president.json"
-
-	// StateFormatURL is used to format the URL
-	StateFormatURL = "https://apps.npr.org/elections20-interactive/data/states/%s.json"
 )
 
 type NPRStateData struct {
@@ -24,17 +19,49 @@ type NPRStateData struct {
 
 // Transform transforms the NPRData to our data format
 func (data *NPRStateData) Transform() []election.Vote {
-	var votes []election.Vote
+
+	stateNormalized := make(map[StateCandidate]election.Vote)
 
 	for _, result := range data.Results {
 		// currently we only care about president. NPR offers senate. If we have time (which we likely won't)
 		// We can add senate and house since the data is easily accessible.
 		if !result.Test && result.Office == "P" {
-			votes = append(votes, result.Transform()...)
+			for _, vote := range result.Transform() {
+				deduplicateVote(stateNormalized, vote)
+
+			}
 		}
 	}
 
+	votes := make([]election.Vote, 0, len(stateNormalized))
+	for _, val := range stateNormalized {
+		votes = append(votes, val)
+	}
+
 	return votes
+}
+
+type StateCandidate struct {
+	state     string
+	candidate string
+}
+
+func deduplicateVote(m map[StateCandidate]election.Vote, vote election.Vote) {
+	c := StateCandidate{
+		state:     vote.State.Abbreviation,
+		candidate: vote.Candidate.LastName,
+	}
+
+	existing, ok := m[c]
+
+	if !ok {
+		m[c] = vote
+		return
+	}
+
+	existing.ElectoralVotes = existing.ElectoralVotes + vote.ElectoralVotes
+	existing.Count = existing.Count + vote.Count
+	existing.Percentage = existing.Percentage + vote.Percentage
 }
 
 type NPRElectionData struct {
@@ -146,15 +173,6 @@ type NPRCandidateData struct {
 	Count int `json:",omitempty"`
 }
 
-func FormatURL(code string) string {
-	code = strings.ToUpper(code)
-
-	if election.StateExists(code) {
-		return fmt.Sprintf(StateFormatURL, code)
-	}
-	return AllStatesURL
-}
-
 // NPRScraper is an implementation of the Scraper interface
 // using the NPR interactive election data
 // URL: https://apps.npr.org/elections20-interactive/data/president.json
@@ -194,7 +212,7 @@ func (npr *NPRScraper) getStateFromContext(ctx context.Context) string {
 }
 
 func (npr *NPRScraper) Fetch(state string) ([]election.Vote, error) {
-	response, err := http.Get(FormatURL(state))
+	response, err := http.Get(AllStatesURL)
 
 	if err != nil {
 		return nil, err
