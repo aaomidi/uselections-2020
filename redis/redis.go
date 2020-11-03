@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"strconv"
 	"strings"
 )
 
@@ -26,9 +27,9 @@ func New(url string) (*Redis, error) {
 	}, nil
 }
 
-func (r *Redis) GetMessageIdForState(state string) (int64, error) {
+func (r *Redis) GetMessageIdForState(channelId int64, state string) (int64, error) {
 	val := r.client.Get(context.Background(),
-		fmt.Sprintf("state-%s", strings.ToUpper(state)),
+		fmt.Sprintf("state-%d-%s", channelId, strings.ToUpper(state)),
 	)
 
 	messageId, err := val.Int64()
@@ -40,9 +41,9 @@ func (r *Redis) GetMessageIdForState(state string) (int64, error) {
 	return messageId, nil
 }
 
-func (r *Redis) SaveMessageIdForState(state string, messageId int64) error {
+func (r *Redis) SaveMessageIdForState(channelId int64, state string, messageId int64) error {
 	err := r.client.Set(context.Background(),
-		fmt.Sprintf("state-%s", strings.ToUpper(state)),
+		fmt.Sprintf("state-%d-%s", channelId, strings.ToUpper(state)),
 		messageId,
 		0,
 	).Err()
@@ -52,4 +53,39 @@ func (r *Redis) SaveMessageIdForState(state string, messageId int64) error {
 	}
 
 	return nil
+}
+
+func (r *Redis) SaveInlineMessageId(state string, inlineMessageId string) error {
+	err := r.client.RPush(context.Background(),
+		fmt.Sprintf("inline-state-%s", strings.ToUpper(state)),
+		inlineMessageId,
+	).Err()
+
+	if err != nil {
+		return NewError(err, "Could not save a new inline message")
+	}
+
+	return nil
+}
+
+func (r *Redis) GetInlineMessageId(state string, inlineMessageId string) ([]int64, error) {
+	result := r.client.LRange(context.Background(),
+		fmt.Sprintf("inline-state-%s", strings.ToUpper(state)),
+		0, -1,
+	)
+
+	if result.Err() != nil {
+		return nil, NewError(result.Err(), "Could not save a new inline message")
+	}
+
+	result.Val()
+	finalResult := make([]int64, 0, len(result.Val()))
+	for _, r := range result.Val() {
+		v, err := strconv.ParseInt(r, 10, 64)
+		if err != nil {
+			return nil, NewError(err, "Error when parsing one of the values from results")
+		}
+		finalResult = append(finalResult, v)
+	}
+	return finalResult, nil
 }
