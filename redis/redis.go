@@ -34,12 +34,12 @@ func New(url string) (*Redis, error) {
 	return self, nil
 }
 
-func (r *Redis) GetMessageIdForState(channelId int64, state string) (int64, error) {
+func (r *Redis) GetMessageIdForState(channelId int64, state string) (int, error) {
 	val := r.client.Get(context.Background(),
 		fmt.Sprintf("state-%d-%s", channelId, strings.ToUpper(state)),
 	)
 
-	messageId, err := val.Int64()
+	messageId, err := val.Int()
 
 	if err != nil {
 		return 0, NewError(err, "Message ID did not convert to int64 or something")
@@ -48,7 +48,7 @@ func (r *Redis) GetMessageIdForState(channelId int64, state string) (int64, erro
 	return messageId, nil
 }
 
-func (r *Redis) SaveMessageIdForState(channelId int64, state string, messageId int64) error {
+func (r *Redis) SaveMessageIdForState(channelId int64, state string, messageId int) error {
 	err := r.client.Set(context.Background(),
 		fmt.Sprintf("state-%d-%s", channelId, strings.ToUpper(state)),
 		messageId,
