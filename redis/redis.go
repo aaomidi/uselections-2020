@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	log "github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
 )
@@ -11,6 +12,7 @@ import (
 type Redis struct {
 	options *redis.Options
 	client  *redis.Client
+	log     *log.Entry
 }
 
 func New(url string) (*Redis, error) {
@@ -21,10 +23,15 @@ func New(url string) (*Redis, error) {
 
 	r := redis.NewClient(options)
 
-	return &Redis{
+	self := &Redis{
 		options: options,
 		client:  r,
-	}, nil
+		log:     log.WithField("source", "redis"),
+	}
+
+	self.log.Infof("redis connected to %s", url)
+
+	return self, nil
 }
 
 func (r *Redis) GetMessageIdForState(channelId int64, state string) (int64, error) {

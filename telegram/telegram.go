@@ -1,6 +1,8 @@
 package telegram
 
 import (
+	"github.com/aaomidi/uselections-2020/data"
+	"github.com/aaomidi/uselections-2020/redis"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
 	"time"
@@ -12,14 +14,18 @@ type Telegram struct {
 	channelID string
 	channel   *tb.Chat
 	log       *log.Entry
+	redis     *redis.Redis
+	data      *data.Data
 }
 
-func New(token string, channelId string) Telegram {
+func New(token string, channelId string, r *redis.Redis, d *data.Data) Telegram {
 	return Telegram{
 		token:     token,
 		bot:       nil,
 		channelID: channelId,
 		log:       log.WithField("source", "telegram"),
+		redis:     r,
+		data:      d,
 	}
 }
 
