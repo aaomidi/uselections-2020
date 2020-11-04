@@ -1,8 +1,10 @@
 package telegram
 
 import (
+	"github.com/aaomidi/uselections-2020/election"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
+	"strings"
 	"time"
 )
 
@@ -59,10 +61,47 @@ func (t *Telegram) Start() {
 }
 
 func (t *Telegram) handleQuery(q *tb.Query) {
+	msg := q.Text
 
+	if len(msg) != 2 {
+		_ = t.bot.Answer(q, &tb.QueryResponse{
+			Results:   nil,
+			CacheTime: 60,
+		})
+		return
+	}
+	states := election.GetIndexStates()
+
+	state, ok := states[strings.ToUpper(msg)]
+
+	if !ok {
+		_ = t.bot.Answer(q, &tb.QueryResponse{
+			Results:   nil,
+			CacheTime: 60,
+		})
+		return
+	}
+	article := &tb.ArticleResult{
+		Title:       state.Name,
+		Text:        "Updating soon",
+		Description: state.Name,
+	}
+
+	r := make(tb.Results, 1)
+	r[0] = article
+	_ = t.bot.Answer(q, &tb.QueryResponse{
+		Results:   r,
+		CacheTime: 0,
+		QueryID:   state.Abbreviation,
+	})
 }
 
 func (t *Telegram) handleChosenInlineResult(c *tb.ChosenInlineResult) {
+	states := election.GetIndexStates()
+	_, ok := states[strings.ToUpper(c.Query)]
+	if !ok {
+		return
+	}
 
 }
 
