@@ -75,7 +75,7 @@ func (r *Redis) SaveInlineMessageId(state string, inlineMessageId string) error 
 	return nil
 }
 
-func (r *Redis) GetInlineMessageId(state string, inlineMessageId string) ([]int64, error) {
+func (r *Redis) GetInlineMessageId(state string) ([]int64, error) {
 	result := r.client.LRange(context.Background(),
 		fmt.Sprintf("inline-state-%s", strings.ToUpper(state)),
 		0, -1,
