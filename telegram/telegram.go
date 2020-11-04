@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
 	"time"
 )
@@ -10,6 +11,7 @@ type Telegram struct {
 	bot       *tb.Bot
 	channelID string
 	channel   *tb.Chat
+	log       *log.Entry
 }
 
 func New(token string, channelId string) Telegram {
@@ -17,6 +19,7 @@ func New(token string, channelId string) Telegram {
 		token:     token,
 		bot:       nil,
 		channelID: channelId,
+		log:       log.WithField("source", "telegram"),
 	}
 }
 
@@ -38,6 +41,8 @@ func (t *Telegram) Create() error {
 	}
 
 	t.channel = channel
+
+	t.log.Infof("connected to %s", t.channelID)
 
 	return nil
 }

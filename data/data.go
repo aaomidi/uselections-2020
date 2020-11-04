@@ -10,6 +10,7 @@ import (
 
 type Data struct {
 	broadcaster chan<- BroadcastRequest
+	log         *log.Entry
 }
 
 type BroadcastRequest struct {
@@ -28,11 +29,12 @@ type OutgoingUpdate struct {
 func (d *Data) Start(s scraper.Scraper) {
 	broadcaster := make(chan BroadcastRequest)
 	d.broadcaster = broadcaster
+	d.log = log.WithField("source", "data")
 
 	aggregation := make(chan []election.Vote)
 	go func(s scraper.Scraper) {
-
 		for range time.Tick(5 * time.Second) {
+			d.log.Info("running scraper")
 			votes := make([]election.Vote, 0, 153)
 			for vote := range s.Scrape(context.Background()) {
 				votes = append(votes, vote)
@@ -59,7 +61,7 @@ func (d *Data) aggregate(incoming <-chan []election.Vote, broadcastRequests <-ch
 					NotificationVotes: nil,
 				}:
 				default:
-					log.Warning("Some listener was full :/")
+					d.log.Warning("Some listener was full :/")
 				}
 			}
 		}

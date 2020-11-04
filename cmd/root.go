@@ -12,6 +12,7 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		viper.SetConfigName("config")
 		viper.AddConfigPath(".")
+		viper.SetEnvPrefix("bot")
 		viper.AutomaticEnv()
 
 		_ = viper.ReadInConfig()
@@ -50,6 +51,12 @@ func init() {
 	rootCmd.PersistentFlags().String("log", "info", "The log level to output")
 	rootCmd.PersistentFlags().Bool("colors", false, "Force output with colors")
 
+	rootCmd.PersistentFlags().String("token", "", "Telegram bot API token")
+	rootCmd.PersistentFlags().String("channel", "", "Telegram channel ID")
+
 	_ = viper.BindPFlag("log", rootCmd.PersistentFlags().Lookup("log"))
 	_ = viper.BindPFlag("colors", rootCmd.PersistentFlags().Lookup("colors"))
+
+	_ = viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
+	_ = viper.BindPFlag("channel", rootCmd.PersistentFlags().Lookup("channel"))
 }
