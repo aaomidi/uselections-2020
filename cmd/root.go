@@ -54,9 +54,17 @@ func init() {
 	rootCmd.PersistentFlags().String("token", "", "Telegram bot API token")
 	rootCmd.PersistentFlags().String("channel", "", "Telegram channel ID")
 
+	rootCmd.PersistentFlags().String("redis-host", "127.0.0.1", "Redis Host")
+	rootCmd.PersistentFlags().Int("redis-port", 6379, "Redis Port")
+	rootCmd.PersistentFlags().Int("redis-db", 0, "Redis DB")
+
 	_ = viper.BindPFlag("log", rootCmd.PersistentFlags().Lookup("log"))
 	_ = viper.BindPFlag("colors", rootCmd.PersistentFlags().Lookup("colors"))
 
 	_ = viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
 	_ = viper.BindPFlag("channel", rootCmd.PersistentFlags().Lookup("channel"))
+
+	_ = viper.BindPFlag("redis.host", rootCmd.PersistentFlags().Lookup("redis-host"))
+	_ = viper.BindPFlag("redis.port", rootCmd.PersistentFlags().Lookup("redis-port"))
+	_ = viper.BindPFlag("redis.db", rootCmd.PersistentFlags().Lookup("redis-db"))
 }
