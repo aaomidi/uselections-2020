@@ -135,6 +135,10 @@ func (data *NPRElectionData) Transform() []election.Vote {
 				LastName:  candidate.Last,
 				Party:     election.GetParty(candidate.Party),
 			},
+			State: election.State{
+				Name:         data.StateName,
+				Abbreviation: data.State,
+			},
 			Percentage:     candidate.Percent,
 			Count:          candidate.Votes,
 			ElectoralVotes: candidate.Electoral,
