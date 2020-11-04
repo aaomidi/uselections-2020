@@ -37,9 +37,8 @@ func New(token string, channelID string, r *redis.Redis, d *data.Data) Telegram 
 
 func (t *Telegram) Create() error {
 	bot, err := tb.NewBot(tb.Settings{
-		Token:   t.token,
-		Poller:  &tb.LongPoller{Timeout: 15 * time.Second},
-		Verbose: true,
+		Token:  t.token,
+		Poller: &tb.LongPoller{Timeout: 15 * time.Second},
 	})
 	t.bot = bot
 
@@ -165,6 +164,8 @@ func (t *Telegram) runListener() {
 
 func (t *Telegram) runUpdater() {
 	m := make(map[string]*StateVote)
+	dem := make(map[string]int64)
+	rep := make(map[string]int64)
 	for {
 		update := <-t.dataChannel
 
@@ -186,6 +187,26 @@ func (t *Telegram) runUpdater() {
 
 		for _, val := range m {
 			state := val.dem.State.Abbreviation
+			send := false
+			if v, ok := dem[state]; ok {
+				if val.dem.Count > v+int64(float64(v)*0.02) {
+					send = true
+				}
+			} else {
+				send = true
+			}
+
+			if v, ok := rep[state]; ok {
+				if val.rep.Count > v+int64(float64(v)*0.02) {
+					send = true
+				}
+			} else {
+				send = true
+			}
+
+			if !send {
+				continue
+			}
 
 			id, err := t.redis.GetMessageIdForState(t.channel.ID, state)
 
@@ -193,11 +214,29 @@ func (t *Telegram) runUpdater() {
 				continue
 			}
 
+			dem[state] = val.dem.Count
+			rep[state] = val.rep.Count
+
 			editableMsg := EditableMessage{
 				MsgID:     id,
 				ChannelID: t.channel.ID,
 			}
-			_, _ = t.bot.Edit(editableMsg, GetPrettyMessage(val))
+
+			t.log.Infof("sending update for %s", state)
+
+			for i := 0; i < 12; i++ {
+				_, err = t.bot.Edit(editableMsg, GetPrettyMessage(val))
+
+				if err == nil || strings.Contains(err.Error(), "message is not modified") {
+					break
+				}
+
+				if i < 11 && strings.Contains(err.Error(), "Too Many Requests") {
+					time.Sleep(time.Second * 5)
+				} else {
+					t.log.WithError(err).Warnf("failed updating state %s", state)
+				}
+			}
 		}
 	}
 }
