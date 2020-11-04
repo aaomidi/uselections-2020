@@ -1,13 +1,14 @@
 package telegram
 
 import (
+	"fmt"
 	"github.com/aaomidi/uselections-2020/data"
 	"github.com/aaomidi/uselections-2020/election"
 	"github.com/aaomidi/uselections-2020/redis"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -126,24 +127,25 @@ func (t *Telegram) Stop() {
 }
 
 func (t *Telegram) runListener() {
+	go t.runUpdater()
 	for _, s := range election.GetStates() {
 		state, err := t.redis.GetMessageIdForState(t.channel.ID, s.Abbreviation)
 
 		if err != nil || state == 0 {
 			t.log.Infof("sending new message for %s", s)
 
-			menu := &tb.ReplyMarkup{ResizeReplyKeyboard: true}
+			//menu := &tb.ReplyMarkup{ResizeReplyKeyboard: true}
+			//
+			//menu.InlineKeyboard = [][]tb.InlineButton{
+			//	{
+			//		{
+			//			Text:   "Subscribe?",
+			//			Unique: "something",
+			//		},
+			//	},
+			//}
 
-			menu.InlineKeyboard = [][]tb.InlineButton{
-				{
-					{
-						Text:   "Subscribe?",
-						Unique: "something",
-					},
-				},
-			}
-
-			send, err := t.bot.Send(t.channel, "Hello world, this message is for: "+s.Name, menu)
+			send, err := t.bot.Send(t.channel, "Hello world, this message is for: "+s.Name)
 
 			if err != nil {
 				panic(errors.Wrap(err, "cba to deal with this rn"))
@@ -159,11 +161,87 @@ func (t *Telegram) runListener() {
 		}
 	}
 
+}
+
+func (t *Telegram) runUpdater() {
+	m := make(map[string]*StateVote)
 	for {
 		update := <-t.dataChannel
 
-		spew.Dump(update)
+		for _, vote := range update.Votes {
+			val, ok := m[vote.State.Abbreviation]
+			if !ok {
+				val = &StateVote{}
+				m[vote.State.Abbreviation] = val
+			}
 
-		// TODO Messages and UX
+			if vote.Candidate.Party.Abbreviation == "Dem" {
+				val.dem = vote
+			}
+
+			if vote.Candidate.Party.Abbreviation == "GOP" {
+				val.rep = vote
+			}
+		}
+
+		for _, val := range m {
+			state := val.dem.State.Abbreviation
+
+			id, err := t.redis.GetMessageIdForState(t.channel.ID, state)
+
+			if err != nil || id == 0 {
+				continue
+			}
+
+			editableMsg := EditableMessage{
+				MsgID:     id,
+				ChannelID: t.channel.ID,
+			}
+			_, _ = t.bot.Edit(editableMsg, GetPrettyMessage(val))
+		}
 	}
+}
+
+func GetPrettyMessage(vote *StateVote) string {
+
+	dem := vote.dem
+	rep := vote.rep
+
+	return fmt.Sprintf(
+		`
+%s
+
+%s State Results
+%s
+%s`,
+
+		getPeekable(vote), dem.State.Name, getCandidateBlock(dem), getCandidateBlock(rep))
+}
+
+func getCandidateBlock(vote election.Vote) string {
+	return fmt.Sprintf(
+		`%s (%s)
+	Votes: %d (%.2f%%)
+	Electoral Votes: %d
+`, vote.Candidate.LastName, vote.Candidate.Party.Symbol, vote.Count, vote.Percentage, vote.ElectoralVotes)
+}
+
+func getPeekable(vote *StateVote) string {
+	dem := vote.dem
+	rep := vote.rep
+	return fmt.Sprintf("%s - %s: %d (%.2f%%) %s: %d (%.2f%%)", dem.State.Abbreviation, dem.Candidate.Party.Symbol, dem.Count, dem.Percentage, rep.Candidate.Party.Symbol, rep.Count, rep.Percentage)
+}
+
+type StateVote struct {
+	dem election.Vote
+	rep election.Vote
+}
+
+type EditableMessage struct {
+	MsgID     int
+	ChannelID int64
+}
+
+func (e EditableMessage) MessageSig() (messageID string, chatID int64) {
+	return strconv.Itoa(e.MsgID), e.ChannelID
 }
