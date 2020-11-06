@@ -7,6 +7,8 @@ import (
 	"github.com/aaomidi/uselections-2020/redis"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	tb "gopkg.in/tucnak/telebot.v2"
 	"strconv"
 	"strings"
@@ -60,7 +62,7 @@ func (t *Telegram) Create() error {
 }
 
 func (t *Telegram) Start() {
-	t.dataChannel = make(chan data.OutgoingUpdate)
+	t.dataChannel = make(chan data.OutgoingUpdate, 2)
 
 	t.data.RegisterDataReceiver(t.dataChannel)
 
@@ -97,11 +99,23 @@ func (t *Telegram) handleQuery(q *tb.Query) {
 		})
 		return
 	}
+
 	article := &tb.ArticleResult{
 		Title:       state.Name,
 		Text:        "Updating soon",
 		Description: state.Name,
 	}
+
+	markup := [][]tb.InlineButton{
+		{
+			{
+				Text:        "Share 🔗",
+				InlineQuery: state.Abbreviation,
+			},
+		},
+	}
+
+	article.SetReplyMarkup(markup)
 
 	r := make(tb.Results, 1)
 	r[0] = article
@@ -112,13 +126,25 @@ func (t *Telegram) handleQuery(q *tb.Query) {
 	})
 }
 
+func getShareMarkup(stateAbbreviation string) [][]tb.InlineButton {
+	return [][]tb.InlineButton{
+		{
+			{
+				Text:        "Share 🔗",
+				InlineQuery: stateAbbreviation,
+			},
+		},
+	}
+}
+
 func (t *Telegram) handleChosenInlineResult(c *tb.ChosenInlineResult) {
 	states := election.GetIndexStates()
-	_, ok := states[strings.ToUpper(c.Query)]
+	state, ok := states[strings.ToUpper(c.Query)]
 	if !ok {
 		return
 	}
 
+	_ = t.redis.SaveInlineMessageId(state.Abbreviation, c.MessageID)
 }
 
 func (t *Telegram) Stop() {
@@ -132,17 +158,6 @@ func (t *Telegram) runListener() {
 
 		if err != nil || state == 0 {
 			t.log.Infof("sending new message for %s", s)
-
-			//menu := &tb.ReplyMarkup{ResizeReplyKeyboard: true}
-			//
-			//menu.InlineKeyboard = [][]tb.InlineButton{
-			//	{
-			//		{
-			//			Text:   "Subscribe?",
-			//			Unique: "something",
-			//		},
-			//	},
-			//}
 
 			send, err := t.bot.Send(t.channel, "Hello world, this message is for: "+s.Name)
 
@@ -164,8 +179,8 @@ func (t *Telegram) runListener() {
 
 func (t *Telegram) runUpdater() {
 	m := make(map[string]*StateVote)
-	dem := make(map[string]int64)
-	rep := make(map[string]int64)
+	lastSent := time.Now().Add(-1 * time.Hour)
+	sent := false
 	for {
 		update := <-t.dataChannel
 
@@ -186,27 +201,14 @@ func (t *Telegram) runUpdater() {
 		}
 
 		for _, val := range m {
-			state := val.dem.State.Abbreviation
-			send := false
-			if v, ok := dem[state]; ok {
-				if val.dem.Count > v+int64(float64(v)*0.02) {
-					send = true
-				}
-			} else {
-				send = true
-			}
+			currentTime := time.Now()
 
-			if v, ok := rep[state]; ok {
-				if val.rep.Count > v+int64(float64(v)*0.02) {
-					send = true
-				}
-			} else {
-				send = true
-			}
-
-			if !send {
+			if currentTime.Sub(lastSent) < 20*time.Second {
 				continue
 			}
+			sent = true
+
+			state := val.dem.State.Abbreviation
 
 			id, err := t.redis.GetMessageIdForState(t.channel.ID, state)
 
@@ -214,33 +216,50 @@ func (t *Telegram) runUpdater() {
 				continue
 			}
 
-			dem[state] = val.dem.Count
-			rep[state] = val.rep.Count
-
 			editableMsg := EditableMessage{
-				MsgID:     id,
+				MsgID:     strconv.Itoa(id),
 				ChannelID: t.channel.ID,
 			}
 
 			t.log.Infof("sending update for %s", state)
 
-			for i := 0; i < 12; i++ {
-				_, err = t.bot.Edit(editableMsg, GetPrettyMessage(val))
+			//for i := 0; i < 12; i++ {
+			//	_, err = t.bot.Edit(editableMsg, GetPrettyMessage(val), tb.ModeHTML)
+			//
+			//	if err == nil || strings.Contains(err.Error(), "message is not modified") {
+			//		break
+			//	}
+			//
+			//	if i < 11 && strings.Contains(err.Error(), "Too Many Requests") {
+			//		time.Sleep(time.Second * 5)
+			//	} else {
+			//		t.log.WithError(err).Warnf("failed updating state %s", state)
+			//	}
+			//}
 
-				if err == nil || strings.Contains(err.Error(), "message is not modified") {
-					break
-				}
+			msgs, err := t.redis.GetInlineMessageId(state)
 
-				if i < 11 && strings.Contains(err.Error(), "Too Many Requests") {
-					time.Sleep(time.Second * 5)
-				} else {
-					t.log.WithError(err).Warnf("failed updating state %s", state)
+			if err == nil {
+				for _, msgId := range msgs {
+					editableMsg = EditableMessage{
+						MsgID:     msgId,
+						ChannelID: 0,
+					}
+					_, err = t.bot.Edit(editableMsg, GetPrettyMessage(val), tb.ModeHTML, &tb.ReplyMarkup{InlineKeyboard: getShareMarkup(state)})
+					t.log.WithError(err).Info("Some error happened")
 				}
 			}
+		}
+		if sent {
+			lastSent = time.Now()
+			sent = false
 		}
 	}
 }
 
+func getPrinter() *message.Printer {
+	return message.NewPrinter(language.English)
+}
 func GetPrettyMessage(vote *StateVote) string {
 
 	dem := vote.dem
@@ -252,23 +271,33 @@ func GetPrettyMessage(vote *StateVote) string {
 
 %s State Results
 %s
-%s`,
+%s
 
-		getPeekable(vote), dem.State.Name, getCandidateBlock(dem), getCandidateBlock(rep))
+Last Updated %s
+`,
+
+		getPeekable(vote), dem.State.Name, getCandidateBlock(dem), getCandidateBlock(rep), getFormattedTime())
+}
+
+func getFormattedTime() string {
+	loc, _ := time.LoadLocation("America/New_York")
+	str := time.Now().In(loc).Format("15:04 MST")
+
+	return str
 }
 
 func getCandidateBlock(vote election.Vote) string {
-	return fmt.Sprintf(
-		`%s (%s)
+	return getPrinter().Sprintf(
+		`%s <b>%s</b>
 	Votes: %d (%.2f%%)
 	Electoral Votes: %d
-`, vote.Candidate.LastName, vote.Candidate.Party.Symbol, vote.Count, vote.Percentage, vote.ElectoralVotes)
+`, vote.Candidate.Party.Symbol, vote.Candidate.LastName, vote.Count, vote.Percentage*100, vote.ElectoralVotes)
 }
 
 func getPeekable(vote *StateVote) string {
 	dem := vote.dem
 	rep := vote.rep
-	return fmt.Sprintf("%s - %s: %d (%.2f%%) %s: %d (%.2f%%)", dem.State.Abbreviation, dem.Candidate.Party.Symbol, dem.Count, dem.Percentage, rep.Candidate.Party.Symbol, rep.Count, rep.Percentage)
+	return getPrinter().Sprintf("%s - %s: %d (%.2f%%) %s: %d (%.2f%%)", dem.State.Abbreviation, dem.Candidate.Party.Symbol, dem.Count, dem.Percentage*100, rep.Candidate.Party.Symbol, rep.Count, rep.Percentage*100)
 }
 
 type StateVote struct {
@@ -277,10 +306,10 @@ type StateVote struct {
 }
 
 type EditableMessage struct {
-	MsgID     int
+	MsgID     string
 	ChannelID int64
 }
 
 func (e EditableMessage) MessageSig() (messageID string, chatID int64) {
-	return strconv.Itoa(e.MsgID), e.ChannelID
+	return e.MsgID, e.ChannelID
 }

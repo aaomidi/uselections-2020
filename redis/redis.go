@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	log "github.com/sirupsen/logrus"
-	"strconv"
 	"strings"
 )
 
@@ -75,7 +74,7 @@ func (r *Redis) SaveInlineMessageId(state string, inlineMessageId string) error 
 	return nil
 }
 
-func (r *Redis) GetInlineMessageId(state string) ([]int64, error) {
+func (r *Redis) GetInlineMessageId(state string) ([]string, error) {
 	result := r.client.LRange(context.Background(),
 		fmt.Sprintf("inline-state-%s", strings.ToUpper(state)),
 		0, -1,
@@ -85,14 +84,19 @@ func (r *Redis) GetInlineMessageId(state string) ([]int64, error) {
 		return nil, NewError(result.Err(), "Could not save a new inline message")
 	}
 
-	result.Val()
-	finalResult := make([]int64, 0, len(result.Val()))
-	for _, r := range result.Val() {
-		v, err := strconv.ParseInt(r, 10, 64)
-		if err != nil {
-			return nil, NewError(err, "Error when parsing one of the values from results")
-		}
-		finalResult = append(finalResult, v)
+	return result.Val(), nil
+}
+
+func (r *Redis) RemoveInlineMessageId(state string, msgId string) error {
+	err := r.client.LRem(context.Background(),
+		fmt.Sprintf("inline-state-%s", strings.ToUpper(state)),
+		0,
+		msgId,
+	).Err()
+
+	if err != nil {
+		return NewError(err, "Could not remove inline message")
 	}
-	return finalResult, nil
+
+	return nil
 }
